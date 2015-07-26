@@ -3,6 +3,8 @@ package com.aravindan.android.popularmoviesapp;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.preference.Preference;
@@ -31,7 +33,8 @@ public class PopularMoviesActivityFragment extends Fragment{
     private final String LOG_TAG = this.getClass().getName();
     private MoviePosterAdapter mMoviePosterAdapter;
     private ArrayList<Movie> mMovies = new ArrayList<>();
-    private int mPageNumber = 0;
+    private int mPageNumber;
+    private boolean mEndOfPagesToastDisplayed;
     public PopularMoviesActivityFragment() {
     }
 
@@ -40,10 +43,10 @@ public class PopularMoviesActivityFragment extends Fragment{
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState)  {
-        Log.d(LOG_TAG, "Inside onCreateView");
+        //Log.d(LOG_TAG, "Inside onCreateView");
         View rootView = inflater.inflate(R.layout.fragment_popular_movies, container, false);
         GridView moviesGridView = (GridView)rootView.findViewById(R.id.gridview_movies_list);
-        mMoviePosterAdapter = new MoviePosterAdapter(getActivity(), mMovies);
+        mMoviePosterAdapter = new MoviePosterAdapter(getActivity());
         moviesGridView.setAdapter(mMoviePosterAdapter);
         moviesGridView.setOnScrollListener(new AbsListView.OnScrollListener() {
             @Override
@@ -53,11 +56,17 @@ public class PopularMoviesActivityFragment extends Fragment{
 
             @Override
             public void onScroll(AbsListView view, int firstVisibleItem, int visibleItemCount, int totalItemCount) {
-                if (firstVisibleItem + visibleItemCount >= totalItemCount) {
-                    Log.d(LOG_TAG, "Inside onScroll firstVisibleItem : "+firstVisibleItem);
-                    Log.d(LOG_TAG, "Inside onScroll visibleItemCount : "+visibleItemCount);
-                    Log.d(LOG_TAG, "Inside onScroll visibleItemCount : "+totalItemCount);
-                    executeMoviesTask("append");
+                if (firstVisibleItem != 0 && firstVisibleItem + visibleItemCount >= totalItemCount){
+                    if (mPageNumber < 1000) {
+                        executeMoviesTask("append");
+                    }
+                    else{
+                        if (view.getLastVisiblePosition()+1==totalItemCount && !mEndOfPagesToastDisplayed && mPageNumber == 1000){
+                            Toast endOfPagesToast = Toast.makeText(getActivity().getApplicationContext(), "You're at the end of the list.", Toast.LENGTH_SHORT);
+                            endOfPagesToast.show();
+                            mEndOfPagesToastDisplayed = true;
+                        }
+                    }
                 }
 
             }
@@ -66,8 +75,8 @@ public class PopularMoviesActivityFragment extends Fragment{
         moviesGridView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-                MoviePosterAdapter adapter = (MoviePosterAdapter)parent.getAdapter();
-                Movie movie = (Movie)adapter.getItem(position);
+                MoviePosterAdapter adapter = (MoviePosterAdapter) parent.getAdapter();
+                Movie movie = adapter.getItem(position);
                 Intent intent = new Intent(getActivity(), MovieDetailsActivity.class);
                 intent.putExtra("MOVIE_DETAIL", movie);
                 startActivity(intent);
@@ -79,15 +88,18 @@ public class PopularMoviesActivityFragment extends Fragment{
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
-        Log.d(LOG_TAG, "Inside onActivityCreated.. ");
+        //Log.d(LOG_TAG, "Inside onActivityCreated.. ");
+
         if (savedInstanceState == null){
-            Log.d(LOG_TAG, "Inside onActivityCreated..saved instance is null, hence, executing task to get from web ");
+            //Log.d(LOG_TAG, "Inside onActivityCreated..saved instance is null, hence, executing task to get from web ");
+            mEndOfPagesToastDisplayed = false;
             executeMoviesTask("refresh");
         }else{
-            Log.d(LOG_TAG, "Inside onActivityCreated..saved instance is not empty, hence, taking data from parcelable ");
+            //Log.d(LOG_TAG, "Inside onActivityCreated..saved instance is not empty, hence, taking data from parcelable ");
+            mEndOfPagesToastDisplayed = false;
             mMovies = savedInstanceState.getParcelableArrayList("MOVIES_LIST");
             mPageNumber = savedInstanceState.getInt("PAGE_NUMBER");
-            Log.d(LOG_TAG, "Inside onActivityCreated.. parcelable arraylist size:  "+mMovies.size());
+            //Log.d(LOG_TAG, "Inside onActivityCreated.. parcelable arraylist size:  "+mMovies.size());
             mMoviePosterAdapter.clear();
             for (int i=0; i<mMovies.size(); i++){
                 mMoviePosterAdapter.addMovie(mMovies.get(i));
@@ -104,34 +116,19 @@ public class PopularMoviesActivityFragment extends Fragment{
         SharedPreferences preferences = getActivity().getPreferences(Context.MODE_PRIVATE);
         String sortBy = preferences.getString(getString(R.string.pref_sort_by), getString(R.string.pref_sort_by_popularity));
         String apiKey = preferences.getString(getString(R.string.pref_api_key), getString(R.string.pref_api_key_value));
-
-        if ("refresh".equals(mode)){
-            Log.d(LOG_TAG, "Inside executeMoviesTask.. mode : "+mode);
-            mPageNumber = 1;
-            //preferences = getActivity().getPreferences(Context.MODE_PRIVATE);
-            //SharedPreferences.Editor prefEditor = preferences.edit();
-            //prefEditor.putInt(getString(R.string.pref_page_number), 1);
-            //prefEditor.commit();
-        }else{
-            Log.d(LOG_TAG, "Inside executeMoviesTask.. mode : "+mode);
-            mPageNumber++;
-            //int pageNumber = preferences.getInt(getString(R.string.pref_page_number), R.integer.page_number);
-            //preferences = getActivity().getPreferences(Context.MODE_PRIVATE);
-            //SharedPreferences.Editor prefEditor = preferences.edit();
-            //pageNumber++;
-            //prefEditor.putInt(getString(R.string.pref_page_number), pageNumber);
-            //prefEditor.commit();
-        }
-        //int pageNumber = preferences.getInt(getString(R.string.pref_page_number), R.integer.page_number);
         MoviesTask moviesTask = new MoviesTask(getActivity(), mMoviePosterAdapter);
-        Log.d(LOG_TAG, "Inside executeMoviesTask.. pageNumber : "+mPageNumber);
-        //Log.d(LOG_TAG, "Inside executeMoviesTask.. created new MoviesTask object");
-        if (mPageNumber <=1000)
-            moviesTask.execute(sortBy, apiKey, mode, Integer.toString(mPageNumber));
-        else{
-            Toast endOfPagesToast = Toast.makeText(getActivity().getApplicationContext(), "You're at the end of the list.", Toast.LENGTH_LONG);
-            endOfPagesToast.show();
+        //Log.d(LOG_TAG, "Inside executeMoviesTask.. pageNumber : " + mPageNumber);
+        if (isInternetAvailable()){
+            if ("refresh".equals(mode)){
+                mPageNumber = 1;
+                mEndOfPagesToastDisplayed = false;
+                moviesTask.execute(sortBy, apiKey, mode, Integer.toString(mPageNumber));
+            }else{
+                mPageNumber++;
+                moviesTask.execute(sortBy, apiKey, mode, Integer.toString(mPageNumber));
+            }
         }
+
         //Log.d(LOG_TAG, "Inside executeMoviesTask.. called moviesTask.execute");
     }
 
@@ -181,11 +178,35 @@ public class PopularMoviesActivityFragment extends Fragment{
 
     @Override
     public void onSaveInstanceState(Bundle outState) {
-        Log.d(LOG_TAG, "onSaveInstanceState is called.");
-        Log.d(LOG_TAG, "onSaveInstanceState mMoviePosterAdapter count: " + mMoviePosterAdapter.getCount());
-        Log.d(LOG_TAG, "onSaveInstanceState mMovies count: "+mMovies.size());
+        //Log.d(LOG_TAG, "onSaveInstanceState is called.");
+        //Log.d(LOG_TAG, "onSaveInstanceState mMoviePosterAdapter count: " + mMoviePosterAdapter.getCount());
+        //Log.d(LOG_TAG, "onSaveInstanceState mMovies count: "+mMovies.size());
+        /*for(int i = 0; i < mMovies.size(); i++){
+            Log.d(LOG_TAG, "Movie in local variable : "+mMovies.get(i).getMovieTitle());
+        }
+        */
+        mMovies.clear();
+
+        for (int i = 0; i < mMoviePosterAdapter.getCount(); i++){
+            //Log.d(LOG_TAG, "Movie in adapter child : "+mMoviePosterAdapter.getItem(i).getMovieTitle());
+            mMovies.add(mMoviePosterAdapter.getItem(i));
+        }
+
+        //Log.d(LOG_TAG, "onSaveInstanceState Page Number : "+mPageNumber);
         outState.putParcelableArrayList("MOVIES_LIST", mMovies);
         outState.putInt("PAGE_NUMBER", mPageNumber);
         super.onSaveInstanceState(outState);
+    }
+
+    public boolean isInternetAvailable(){
+        ConnectivityManager connectivityManager = (ConnectivityManager)getActivity().getSystemService(getActivity().getApplicationContext().CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        boolean returnValue = activeNetworkInfo != null && activeNetworkInfo.isConnected();
+        if (!returnValue){
+            Toast noInternetToast = Toast.makeText(getActivity().getApplicationContext(), "Internet Unavailable", Toast.LENGTH_SHORT);
+            noInternetToast.show();
+        }
+
+        return returnValue;
     }
 }

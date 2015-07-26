@@ -28,16 +28,15 @@ public class MoviePosterAdapter extends BaseAdapter {
     private final String mImageBasePath;
     private ArrayList<Movie> mMovies = new ArrayList<>();
 
-    public MoviePosterAdapter(Context context, ArrayList<Movie> movies){
+    public MoviePosterAdapter(Context context){
         //Log.d(LOG_TAG, "Initializing adapter...");
         mContext = context;
         mImageBasePath = context.getString(R.string.movie_poster_base_path);
-        mMovies = movies;
     }
 
     @Override
     public int getCount() {
-        Log.d(LOG_TAG, "Getting count of movies..."+mMovies.size());
+        //Log.d(LOG_TAG, "Getting count of movies..."+mMovies.size());
         return mMovies.size();
     }
 
@@ -64,7 +63,7 @@ public class MoviePosterAdapter extends BaseAdapter {
     }
 
     @Override
-    public Object getItem(int position) {
+    public Movie getItem(int position) {
         return mMovies.get(position);
     }
 

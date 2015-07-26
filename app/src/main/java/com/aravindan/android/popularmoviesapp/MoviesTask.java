@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.AsyncTask;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
+import android.widget.Toast;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,6 +35,7 @@ public class MoviesTask extends AsyncTask<String, Void, Void> {
     private Context mContext;
     private String mQueryResult;
     private String mMode;
+    private String mError = "";
     private ArrayList<Movie> mMovies = new ArrayList<>();
     private MoviePosterAdapter mMoviePosterAdapter;
     public MoviesTask(Context context, MoviePosterAdapter moviePosterAdapter){
@@ -68,7 +70,8 @@ public class MoviesTask extends AsyncTask<String, Void, Void> {
             }
         }catch(JSONException e1){
             Log.e(LOG_TAG, e1.getMessage(), e1);
-            e1.printStackTrace();
+            mError = "Unexpected Error";
+            //e1.printStackTrace();
         }
 
     }
@@ -115,10 +118,12 @@ public class MoviesTask extends AsyncTask<String, Void, Void> {
 
         }catch(MalformedURLException e1){
             Log.e(LOG_TAG, e1.getMessage(), e1);
-            e1.printStackTrace();
+            mError = "Unexpected Error";
+            //e1.printStackTrace();
         }catch (IOException e2){
             Log.e(LOG_TAG, e2.getMessage(), e2);
-            e2.printStackTrace();
+            mError = "Internet Unavailable";
+            //e2.printStackTrace();
         }finally {
             if (urlConnection != null) {
                 urlConnection.disconnect();
@@ -127,27 +132,34 @@ public class MoviesTask extends AsyncTask<String, Void, Void> {
                 try {
                     reader.close();
                 } catch (final IOException e) {
+                    mError = "Unexpected Error";
                     Log.e(LOG_TAG, "Error closing stream", e);
                 }
             }
         }
-        getMovieDetailsFromQueryResult();
+        if ("".equals(mError))
+            getMovieDetailsFromQueryResult();
         return null;
     }
 
     @Override
     protected void onPostExecute(Void aVoid) {
         //Log.d(LOG_TAG, mQueryResult);
+        if (!"".equals(mError)){
+            Toast endOfPagesToast = Toast.makeText(mContext, mError, Toast.LENGTH_SHORT);
+            endOfPagesToast.show();
+        }else{
+            if(!mMoviePosterAdapter.isEmpty() && "refresh".equals(mMode)){
+                mMoviePosterAdapter.clear();
+            }
+            for (int i=0; i<mMovies.size(); i++){
+                Movie movie = mMovies.get(i);
+                //Log.d(LOG_TAG, "Movie Name : " + movie.getMovieTitle() + ", Poster Path : " + movie.getMoviePosterPath() + ", Movie ID : " + movie.getMovieID());
+                mMoviePosterAdapter.addMovie(movie);
+            }
+            mMoviePosterAdapter.notifyDataSetChanged();
+        }
 
-        if(!mMoviePosterAdapter.isEmpty() && "refresh".equals(mMode)){
-            mMoviePosterAdapter.clear();
-        }
-        for (int i=0; i<mMovies.size(); i++){
-            Movie movie = mMovies.get(i);
-            //Log.d(LOG_TAG, "Movie Name : " + movie.getMovieTitle() + ", Poster Path : " + movie.getMoviePosterPath() + ", Movie ID : " + movie.getMovieID());
-            mMoviePosterAdapter.addMovie(movie);
-        }
-        mMoviePosterAdapter.notifyDataSetChanged();
     }
 
     @Override
